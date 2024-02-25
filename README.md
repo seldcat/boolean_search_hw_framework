@@ -34,11 +34,11 @@ objects.enumerate.txt
 queries.enumerate.txt
 ```
 из ресурсов соревнования.
-
+```
 Файл docs.txt содержит документы
 Файл queries.enumerate.txt содержит запросы
 Файл objects.enumerate.txt содержит соответствие ObjectId паре запрос-документ
-
+```
 Формат objects.enumerate.txt:
 
 ```
