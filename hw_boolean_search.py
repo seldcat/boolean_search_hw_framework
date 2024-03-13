@@ -40,7 +40,7 @@ class QueryTree:
         self.query = ' '.join(query.lower().split())
         self.i = 0
         self.c = None
-        self.words = [word for word in re.split(r'\(|\)|\|| ', self.query.strip()) if word]
+        self.words = re.findall(r'\w+|[()| ]', query)
         self.query_tree = []
     #     каждая хуйня будет словарем, ключ - это операция, элементы - это наши слова из запроса
 
@@ -54,10 +54,13 @@ class QueryTree:
     def parse_query(self):
         self.get()
         result = self._or()
+        print(result)
 
     def _or(self):
         operand1 = self._and()
-        if self.c == '|':
+        self.get()
+
+        while self.c == '|':
             self.get()
             operand2 = self._and()
             return {
@@ -70,9 +73,31 @@ class QueryTree:
 
     def _and(self):
         operand1 = self._token()
-        if self.c == ' ':
+        self.get()
+        result = {}
+        while self.c == ' ':
+            self.get()
             operand2 = self._token()
-
+            result = {
+                'op': 'and',
+                'operand1': operand1,
+                'operand2': operand2
+            }
+        else:
+            if result:
+                return result
+            else:
+                return operand1
+    
+    def _token(self):
+        if self.c == '(':
+            self.get()
+            result = self._or()
+            if self.c == ')':
+                self.get()
+                return result
+        else:
+            return self.c
 
     def search(self, index):
         # TODO: lookup query terms in the index and implement boolean search logic
@@ -91,32 +116,36 @@ class SearchResults:
 
 def main():
     # Command line arguments.
-    parser = argparse.ArgumentParser(description='Homework: Boolean Search')
-    parser.add_argument('--queries_file', required=True, help='queries.numerate.txt')
-    parser.add_argument('--objects_file', required=True, help='objects.numerate.txt')
-    parser.add_argument('--docs_file', required=True, help='docs.txt')
-    parser.add_argument('--submission_file', required=True, help='output file with relevances')
-    args = parser.parse_args()
+    # parser = argparse.ArgumentParser(description='Homework: Boolean Search')
+    # parser.add_argument('--queries_file', required=True, help='queries.numerate.txt')
+    # parser.add_argument('--objects_file', required=True, help='objects.numerate.txt')
+    # parser.add_argument('--docs_file', required=True, help='docs.txt')
+    # parser.add_argument('--submission_file', required=True, help='output file with relevances')
+    # args = parser.parse_args()
 
-    # Build index.
-    index = Index(args.docs_file)
+    # # Build index.
+    # index = Index(args.docs_file)
 
-    # Process queries.
-    search_results = SearchResults()
-    with codecs.open(args.queries_file, mode='r', encoding='utf-8') as queries_fh:
-        for line in queries_fh:
-            fields = line.rstrip('\n').split('\t')
-            qid = int(fields[0])
-            query = fields[1]
+    # # Process queries.
+    # search_results = SearchResults()
+    # with codecs.open(args.queries_file, mode='r', encoding='utf-8') as queries_fh:
+    #     for line in queries_fh:
+    #         fields = line.rstrip('\n').split('\t')
+    #         qid = int(fields[0])
+    #         query = fields[1]
 
-            # Parse query.
-            query_tree = QueryTree(qid, query)
+    #         # Parse query.
+    #         query_tree = QueryTree(qid, query)
 
-            # Search and save results.
-            search_results.add(query_tree.search(index))
+    #         # Search and save results.
+    #         search_results.add(query_tree.search(index))
 
-    # Generate submission file.
-    search_results.print_submission(args.objects_file, args.submission_file)
+    # # Generate submission file.
+    # search_results.print_submission(args.objects_file, args.submission_file)
+
+    query_tree = QueryTree(0, 'hello world fine')
+    query_tree.parse_query()
+    pass
 
 
 if __name__ == "__main__":
