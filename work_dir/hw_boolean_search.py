@@ -3,36 +3,44 @@
 
 import argparse
 import codecs
-import sys
-import string
+import json
 import re
+import string
 from typing import Optional
+
+from tqdm import tqdm
+import pandas as pd
 
 
 class Index:
     def __init__(self, index_file):
-        self._file = codecs.open(index_file, mode='r', encoding='utf-8')
-        self._index_dict = dict()
-        self._add_docs()
-        self._file.close()
+        with open('index.json', 'r', encoding='utf-8') as f:
+            self.index_dict = {key: set(value) for key, value in json.load(f).items()}
+        # self.file = codecs.open(index_file, mode='r', encoding='utf-8')
+        # self.index_dict = dict()
+        # self.add_docs()
+        # self.file.close()
+        #
+        # with open('index.json', 'w', encoding='utf-8') as jsonfile:
+        #     json.dump({key: list(value) for key, value in self.index_dict.items()}, jsonfile, ensure_ascii=False, indent=2)
 
     def _add_one_doc(self, index, words):
         for word in words:
             lower_word = word.lower().translate(str.maketrans('', '', string.punctuation))
             if not lower_word:
                 continue
-            if lower_word not in self._index_dict:
-                self._index_dict[lower_word] = set()
-            self._index_dict[lower_word].add(index)
+            if lower_word not in self.index_dict:
+                self.index_dict[lower_word] = set()
+            self.index_dict[lower_word].add(index)
 
-    def _add_docs(self):
-        for line in self._file.readlines():
+    def add_docs(self):
+        for line in tqdm(self.file.readlines(), desc='Preparing index'):
             line = line.strip()
             index, words = line.split()[0], line.split()[1:]
             self._add_one_doc(index, words)
 
     def get_ids_by_word(self, word):
-        return self._index_dict[word] if word in self._index_dict else set()
+        return self.index_dict[word] if word in self.index_dict else set()
 
 
 class Token:
@@ -60,7 +68,7 @@ class QueryTree:
         elif len(tokens) == 1:
             return tokens[0]
 
-        tokens = self.__clean(tokens)
+        tokens = self._clean(tokens)
         operators = list()
         current_level = 0
 
@@ -74,16 +82,22 @@ class QueryTree:
                     current_level += 1
                 case ')':
                     current_level -= 1
+        if current_level:
+            raise ValueError
 
         # find the outermost and rightmost operator (AND operator has higher priority)
         min_level = 0
+        min_level_operators = list(filter(lambda x: x[1] == min_level, operators))
         and_operators = list(filter(lambda x: x[1] == min_level and x[0] == ' ', operators))
-        token = and_operators[-1] if and_operators else operators[-1]
+        token = and_operators[-1] if and_operators else min_level_operators[-1]
 
         return Token(token[0], self._get_query_tree(tokens[:token[2]]), self._get_query_tree(tokens[token[2] + 1:]))
 
     @staticmethod
-    def __clean(tokens):
+    def _clean(tokens):
+        """
+        delete brackets if tokens looks like (...)
+        """
         brackets = []
         current_level = 0
         for token in tokens:
@@ -101,14 +115,22 @@ class QueryTree:
         return tokens
 
     def search(self, index):
-        # TODO: lookup query terms in the index and implement boolean search logic
-        pass
+        def collapse(token):
+            if isinstance(token, str):
+                return index.get_ids_by_word(token)
+            left = collapse(token.left)
+            right = collapse(token.right)
+            return left & right if token.operator == ' ' else left | right
+        return self.query_id, collapse(self.query_tree)
 
 
 class SearchResults:
+    def __init__(self):
+        self.results = {}
+
     def add(self, found):
-        # TODO: add next query's results
-        pass
+        qid, search_result = found
+        self.results[qid] = search_result
 
     def print_submission(self, objects_file, submission_file):
         # TODO: generate submission file
@@ -130,7 +152,7 @@ def main():
     # Process queries.
     search_results = SearchResults()
     with codecs.open(args.queries_file, mode='r', encoding='utf-8') as queries_fh:
-        for line in queries_fh:
+        for line in tqdm(queries_fh, desc='Searching'):
             fields = line.rstrip('\n').split('\t')
             qid = int(fields[0])
             query = fields[1]
@@ -145,11 +167,5 @@ def main():
     search_results.print_submission(args.objects_file, args.submission_file)
 
 
-def test():
-    query = QueryTree(1, '(GT1|GT 1)')
-    return
-
-
 if __name__ == "__main__":
-    test()
-
+    main()
