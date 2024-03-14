@@ -6,6 +6,7 @@ import codecs
 import sys
 import string
 import re
+from typing import Optional
 
 
 class Index:
@@ -34,45 +35,45 @@ class Index:
         return self._index_dict[word] if word in self._index_dict else set()
 
 
+class Token:
+    def __init__(self, operator: str, left: Optional['Token'], right: Optional['Token']):
+        self.operator = operator
+        self.left = left
+        self.right = right
+
+
 class QueryTree:
     def __init__(self, qid, query):
         self.query_id = qid
         self.query = ' '.join(query.lower().split())
-        self.i = 0
-        self.c = None
-        self.words = [word for word in re.split(r'\(|\)|\|| ', self.query.strip()) if word]
-        self.query_tree = []
-    #     каждая хуйня будет словарем, ключ - это операция, элементы - это наши слова из запроса
+        self.query_tree = self.get_query_tree(re.findall(r'\w+|[()| ]', query))
 
-    def get(self):
-        if self.i < len(self.words):
-            self.c = self.words[self.i]
-            self.i += 1
-        else:
-            self.c = None
-
-    def parse_query(self):
-        self.get()
-        result = self._or()
-
-    def _or(self):
-        operand1 = self._and()
-        if self.c == '|':
-            self.get()
-            operand2 = self._and()
-            return {
-                'op': 'or',
-                'operand1': operand1,
-                'operand2': operand2
-            }
-        else:
-            return operand1
-
-    def _and(self):
-        operand1 = self._token()
-        if self.c == ' ':
-            operand2 = self._token()
-
+    @staticmethod
+    def get_query_tree(tokens):
+        '''
+        here tokens will be collected in the form (token, level, position), where
+        token is a character like ' ', '|'
+        level is the level at which the token is located (for searching for the outermost operator)
+        position - its position in the query (for searching for the rightmost operator)
+        '''
+        if not tokens:
+            return None
+        operators = list()
+        current_level = 0
+        while tokens[0] == '(' and tokens[-1] == ')':
+            tokens = tokens[1:-1]
+        for i, token in enumerate(tokens):
+            match token:
+                case (' ', '|'):
+                    operators.append((token, current_level, i))
+                case '(':
+                    current_level += 1
+                case ')':
+                    current_level -= 1
+        min_level = min(map(lambda x: x[1], operators))  # TODO возможно нужно просто ставить 0 и не париться с минимумом по всем операторам
+        and_operators = list(filter(lambda x: x[1] == min_level and x[0] == ' ', operators))
+        token = and_operators[-1] if and_operators else operators[-1]
+        return Token(token[0], tokens[:token[2]], tokens[token[2] + 1:])
 
     def search(self, index):
         # TODO: lookup query terms in the index and implement boolean search logic
@@ -119,6 +120,11 @@ def main():
     search_results.print_submission(args.objects_file, args.submission_file)
 
 
+def test():
+    query = QueryTree(1, '(16|XVI) 0 (8T|8 T|8 Т|8Т) T')
+    return
+
+
 if __name__ == "__main__":
-    main()
+    test()
 
