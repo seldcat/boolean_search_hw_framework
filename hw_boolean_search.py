@@ -46,34 +46,59 @@ class QueryTree:
     def __init__(self, qid, query):
         self.query_id = qid
         self.query = ' '.join(query.lower().split())
-        self.query_tree = self.get_query_tree(re.findall(r'\w+|[()| ]', query))
+        self.query_tree = self._get_query_tree(re.findall(r'\w+|[()| ]', self.query))
 
-    @staticmethod
-    def get_query_tree(tokens):
-        '''
+    def _get_query_tree(self, tokens):
+        """
         here tokens will be collected in the form (token, level, position), where
         token is a character like ' ', '|'
         level is the level at which the token is located (for searching for the outermost operator)
         position - its position in the query (for searching for the rightmost operator)
-        '''
+        """
         if not tokens:
             return None
+        elif len(tokens) == 1:
+            return tokens[0]
+
+        tokens = self.__clean(tokens)
         operators = list()
         current_level = 0
-        while tokens[0] == '(' and tokens[-1] == ')':
-            tokens = tokens[1:-1]
+
         for i, token in enumerate(tokens):
             match token:
-                case (' ', '|'):
+                case ' ':
+                    operators.append((token, current_level, i))
+                case '|':
                     operators.append((token, current_level, i))
                 case '(':
                     current_level += 1
                 case ')':
                     current_level -= 1
-        min_level = min(map(lambda x: x[1], operators))  # TODO возможно нужно просто ставить 0 и не париться с минимумом по всем операторам
+
+        # find the outermost and rightmost operator (AND operator has higher priority)
+        min_level = 0
         and_operators = list(filter(lambda x: x[1] == min_level and x[0] == ' ', operators))
         token = and_operators[-1] if and_operators else operators[-1]
-        return Token(token[0], tokens[:token[2]], tokens[token[2] + 1:])
+
+        return Token(token[0], self._get_query_tree(tokens[:token[2]]), self._get_query_tree(tokens[token[2] + 1:]))
+
+    @staticmethod
+    def __clean(tokens):
+        brackets = []
+        current_level = 0
+        for token in tokens:
+            match token:
+                case '(':
+                    current_level += 1
+                    brackets.append(current_level)
+                case ')':
+                    brackets.append(-current_level)
+                    current_level -= 1
+                case _:
+                    brackets.append(0)
+        if brackets[0] == 1 and brackets[-1] == -1 and brackets.count(1) == 1:
+            return tokens[1:-1]
+        return tokens
 
     def search(self, index):
         # TODO: lookup query terms in the index and implement boolean search logic
@@ -121,7 +146,7 @@ def main():
 
 
 def test():
-    query = QueryTree(1, '(16|XVI) 0 (8T|8 T|8 Т|8Т) T')
+    query = QueryTree(1, '(GT1|GT 1)')
     return
 
 
