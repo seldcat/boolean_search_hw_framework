@@ -3,30 +3,24 @@
 
 import argparse
 import codecs
-import json
 import re
 import string
 from typing import Optional
 
-from tqdm import tqdm
 import pandas as pd
+from tqdm import tqdm
 
 
 class Index:
     def __init__(self, index_file):
-        with open('index.json', 'r', encoding='utf-8') as f:
-            self.index_dict = {key: set(value) for key, value in json.load(f).items()}
-        # self.file = codecs.open(index_file, mode='r', encoding='utf-8')
-        # self.index_dict = dict()
-        # self.add_docs()
-        # self.file.close()
-        #
-        # with open('index.json', 'w', encoding='utf-8') as jsonfile:
-        #     json.dump({key: list(value) for key, value in self.index_dict.items()}, jsonfile, ensure_ascii=False, indent=2)
+        self.file = codecs.open(index_file, mode='r', encoding='utf-8')
+        self.index_dict = dict()
+        self.add_docs()
+        self.file.close()
 
     def _add_one_doc(self, index, words):
         for word in words:
-            lower_word = word.lower().translate(str.maketrans('', '', string.punctuation))
+            lower_word = word.lower().translate(str.maketrans(string.punctuation, ' ' * len(string.punctuation)))
             if not lower_word:
                 continue
             if lower_word not in self.index_dict:
@@ -53,7 +47,7 @@ class Token:
 class QueryTree:
     def __init__(self, qid, query):
         self.query_id = qid
-        self.query = ' '.join(query.lower().split())
+        self.query = ' '.join(query.lower().strip().split())
         self.query_tree = self._get_query_tree(re.findall(r'\w+|[()| ]', self.query))
 
     def _get_query_tree(self, tokens):
@@ -126,15 +120,21 @@ class QueryTree:
 
 class SearchResults:
     def __init__(self):
-        self.results = {}
+        self.results = []
 
     def add(self, found):
         qid, search_result = found
-        self.results[qid] = search_result
+        self.results.append(search_result)
 
     def print_submission(self, objects_file, submission_file):
-        # TODO: generate submission file
-        pass
+        df = pd.read_csv(objects_file)
+        f = open(submission_file, 'w')
+        f.write('ObjectId,Relevance\n')
+        for qid in df['QueryId'].unique():
+            values = zip(df[df['QueryId'] == qid]['DocumentId'].values, df[df['QueryId'] == qid]['ObjectId'].values)
+            for elem in values:
+                f.write(','.join([str(elem[1]), str(int(elem[0] in self.results[qid - 1]))]) + '\n')
+        f.close()
 
 
 def main():
