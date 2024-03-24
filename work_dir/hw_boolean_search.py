@@ -8,62 +8,25 @@ import re
 import string
 from typing import Optional
 
-import pandas as pd
-from langdetect import detect
-from nltk.stem.snowball import SnowballStemmer
 from tqdm import tqdm
-
-
-class Stemmer:
-    def __init__(self):
-        self.stemmer = {
-            'ar': SnowballStemmer('arabic'),
-            'de': SnowballStemmer('german'),
-            'en': SnowballStemmer('english'),
-            'hu': SnowballStemmer('hungarian'),
-            'sw': SnowballStemmer('swedish'),
-            'ru': SnowballStemmer('russian'),
-            'pt': SnowballStemmer('portuguese'),
-            'no': SnowballStemmer('norwegian'),
-            'it': SnowballStemmer('italian'),
-            'ro': SnowballStemmer('romanian'),
-            'fr': SnowballStemmer('french'),
-            'nl': SnowballStemmer('dutch')
-        }
-
-    def stem_word(self, word, lang=None):
-        if not word:
-            return word
-        try:
-            if not lang:
-              lang = detect(word)
-            if lang in self.stemmer.keys():
-                return self.stemmer[lang].stem(word)
-        except Exception:
-            return word
-
-
-stemmer = Stemmer()
+import pandas as pd
 
 
 class Index:
     def __init__(self, index_file):
+        # with open('index.json', 'r', encoding='utf-8') as f:
+        #     self.index_dict = {key: set(value) for key, value in json.load(f).items()}
         self.file = codecs.open(index_file, mode='r', encoding='utf-8')
         self.index_dict = dict()
-        # self.add_docs()
-        # self.file.close()
-        # with codecs.open('index.json', 'w') as jsonfile:
-        #     json.dump(self.index_dict, jsonfile, indent=2)
-        with codecs.open('index.json', 'r', encoding='utf-8') as file:
-            self.index_dict = {key: set(value) for key, value in json.load(file).items()}
+        self.add_docs()
+        self.file.close()
+
+        with open('index.json', 'w', encoding='utf-8') as jsonfile:
+            json.dump({key: list(value) for key, value in self.index_dict.items()}, jsonfile, ensure_ascii=False, indent=2)
 
     def _add_one_doc(self, index, words):
-        lang = detect(' '.join(words))
         for word in words:
-            lower_word = stemmer.stem_word(
-                word.lower().translate(str.maketrans(string.punctuation, ' ' * len(string.punctuation))),
-                lang
-            )
+            lower_word = word.lower().translate(str.maketrans('', '', string.punctuation))
             if not lower_word:
                 continue
             if lower_word not in self.index_dict:
@@ -77,7 +40,6 @@ class Index:
             self._add_one_doc(index, words)
 
     def get_ids_by_word(self, word):
-        word = stemmer.stem_word(word)
         return self.index_dict[word] if word in self.index_dict else set()
 
 
@@ -91,7 +53,7 @@ class Token:
 class QueryTree:
     def __init__(self, qid, query):
         self.query_id = qid
-        self.query = ' '.join(query.lower().strip().split())
+        self.query = ' '.join(query.lower().split())
         self.query_tree = self._get_query_tree(re.findall(r'\w+|[()| ]', self.query))
 
     def _get_query_tree(self, tokens):
