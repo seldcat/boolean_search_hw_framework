@@ -1,2 +1,4 @@
 tqdm==4.66.2
 pandas==2.2.1
+langdetect==1.0.9
+nltk==3.8.1
