@@ -3,26 +3,19 @@
 
 import argparse
 import codecs
-import json
 import re
 import string
 from typing import Optional
 
 from tqdm import tqdm
-import pandas as pd
 
 
 class Index:
     def __init__(self, index_file):
-        # with open('index.json', 'r', encoding='utf-8') as f:
-        #     self.index_dict = {key: set(value) for key, value in json.load(f).items()}
         self.file = codecs.open(index_file, mode='r', encoding='utf-8')
         self.index_dict = dict()
         self.add_docs()
         self.file.close()
-
-        with open('index.json', 'w', encoding='utf-8') as jsonfile:
-            json.dump({key: list(value) for key, value in self.index_dict.items()}, jsonfile, ensure_ascii=False, indent=2)
 
     def _add_one_doc(self, index, words):
         for word in words:
@@ -126,21 +119,22 @@ class QueryTree:
 
 class SearchResults:
     def __init__(self):
-        self.results = []
+        self.results = {}
 
     def add(self, found):
         qid, search_result = found
-        self.results.append(search_result)
+        self.results[qid] = search_result
 
     def print_submission(self, objects_file, submission_file):
-        df = pd.read_csv(objects_file)
-        f = open(submission_file, 'w')
-        f.write('ObjectId,Relevance\n')
-        for qid in df['QueryId'].unique():
-            values = zip(df[df['QueryId'] == qid]['DocumentId'].values, df[df['QueryId'] == qid]['ObjectId'].values)
-            for elem in values:
-                f.write(','.join([str(elem[1]), str(int(elem[0] in self.results[qid - 1]))]) + '\n')
-        f.close()
+        with codecs.open(objects_file, 'r', 'utf-8') as f:
+            objects = f.readlines()[1:]
+        with codecs.open(submission_file, 'w', 'utf-8') as f:
+            f.write('ObjectId,Relevance\n')
+            for object in objects:
+                obj_id, qid, docid = object.rstrip('\n').split(',')
+                qid = int(qid)
+                relevance = 1 if docid in self.results[qid] else 0
+                f.write(f'{obj_id},{relevance}\n')
 
 
 def main():
